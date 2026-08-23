@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover so the notch does not letterbox the cave; user-scalable=no
+       so a two-thumb grip does not pinch-zoom the page instead of playing. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Crawlspace</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #b9b3a6;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      overflow: hidden;
+      /* Without these a thumb drag scrolls the page instead of turning the head. */
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #container {
+      position: fixed;
+      inset: 0;
+      display: block;
+    }
+
+    #unity-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      touch-action: none;
+      outline: none;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.4em;
+      background: #000;
+      text-align: center;
+      padding: 6vh 8vw;
+      box-sizing: border-box;
+      z-index: 10;
+    }
+
+    .title {
+      font-size: clamp(22px, 5.2vw, 44px);
+      letter-spacing: 0.42em;
+      text-indent: 0.42em;
+      color: #d8d1c2;
+    }
+
+    .sub {
+      font-size: clamp(12px, 2.6vw, 15px);
+      line-height: 1.85;
+      color: #6f6a60;
+      max-width: 46ch;
+    }
+
+    .sub b { color: #a49d8f; font-weight: normal; }
+
+    .go {
+      margin-top: 0.6em;
+      border: 1px solid #4a463e;
+      padding: 0.85em 2.4em;
+      font-size: clamp(13px, 3vw, 16px);
+      letter-spacing: 0.28em;
+      text-indent: 0.28em;
+      color: #cfc8b9;
+      background: transparent;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .go:active { background: #17150f; }
+
+    #bar {
+      width: min(58vw, 320px);
+      height: 2px;
+      background: #201d18;
+    }
+
+    #fill { width: 0%; height: 100%; background: #7c7565; transition: width .2s; }
+
+    #hint { display: none; }
+    /* Portrait on a phone: the passage is a letterbox, so ask for landscape. */
+    @media (orientation: portrait) and (pointer: coarse) {
+      #hint { display: block; color: #6f6a60; font-size: clamp(11px, 2.6vw, 14px); }
+    }
+
+    #err {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: #2a0c0c; color: #e8b9b9; padding: .8em 1em;
+      font-size: 12px; display: none; white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+  </div>
+
+  <div class="overlay" id="loading">
+    <div class="title">Crawlspace</div>
+    <div class="sub">going down</div>
+    <div id="bar"><div id="fill"></div></div>
+  </div>
+
+  <div class="overlay" id="start" style="display:none">
+    <div class="title">Crawlspace</div>
+
+    <div class="sub" id="desktop-help">
+      <b>W</b> / <b>S</b> crawl &nbsp;·&nbsp; <b>A</b> / <b>D</b> shuffle &nbsp;·&nbsp; <b>mouse</b> look<br>
+      <b>hold left mouse</b> — or the torch falls out of your hand<br>
+      <b>F</b> pocket it &nbsp;·&nbsp; <b>E</b> pick it up &nbsp;·&nbsp; <b>T</b> turn around<br>
+      <b>shift</b> push harder &nbsp;·&nbsp; <b>F8</b> back to the entrance<br>
+      <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
+    </div>
+
+    <div class="sub" id="touch-help" style="display:none">
+      <b>left thumb</b> — drag to crawl and shuffle<br>
+      <b>right thumb</b> — drag to look<br>
+      keeping your right thumb on the screen is what keeps hold of<br>
+      the torch. lift it and the torch drops.<br>
+      <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
+    </div>
+
+    <button class="go" id="go">ENTER</button>
+    <div id="hint">turn your phone sideways</div>
+  </div>
+
+  <div id="err"></div>
+
+  <script>
+    var canvas = document.querySelector("#unity-canvas");
+    var loading = document.querySelector("#loading");
+    var start = document.querySelector("#start");
+    var fill = document.querySelector("#fill");
+    var err = document.querySelector("#err");
+
+    var isTouch = (navigator.maxTouchPoints > 0) &&
+                  /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
+
+    if (isTouch) {
+      document.querySelector("#desktop-help").style.display = "none";
+      document.querySelector("#touch-help").style.display = "block";
+    }
+
+    // Stop the browser from turning a crawl into a page scroll.
+    ["touchstart", "touchmove", "touchend", "gesturestart"].forEach(function (name) {
+      document.addEventListener(name, function (e) {
+        if (e.target === canvas || e.target === document.body) e.preventDefault();
+      }, { passive: false });
+    });
+
+    var buildUrl = "Build";
+    var config = {
+      dataUrl: buildUrl + "/WebGL.data.unityweb",
+      frameworkUrl: buildUrl + "/WebGL.framework.js.unityweb",
+      codeUrl: buildUrl + "/WebGL.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "LucentLL",
+      productName: "Crawlspace",
+      productVersion: "2.1.1",
+      showBanner: function (msg, type) {
+        if (type === "error") {
+          err.style.display = "block";
+          err.textContent = msg;
+        }
+      }
+    };
+
+    // A phone rendering at 3x device pixel ratio is doing nine times the work for
+    // a picture that is deliberately 640x480 before it is scaled up. Pin it to 1.
+    if (isTouch) config.devicePixelRatio = 1;
+
+    var instance = null;
+
+    function resize() {
+      var ratio = isTouch ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * ratio);
+      canvas.height = Math.floor(window.innerHeight * ratio);
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+    resize();
+
+    var script = document.createElement("script");
+    script.src = buildUrl + "/WebGL.loader.js";
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (progress) {
+        fill.style.width = (100 * progress) + "%";
+      }).then(function (unityInstance) {
+        instance = unityInstance;
+        loading.style.display = "none";
+        start.style.display = "flex";
+        resize();
+      }).catch(function (message) {
+        loading.style.display = "none";
+        err.style.display = "block";
+        err.textContent = message;
+      });
+    };
+    document.body.appendChild(script);
+
+    // The gesture matters: browsers will not start an audio context or grant
+    // pointer lock without one, and this game is mostly breathing.
+    document.querySelector("#go").addEventListener("click", function () {
+      start.style.display = "none";
+      canvas.focus();
+      resize();
+
+      if (isTouch && instance && instance.SetFullscreen) {
+        try { instance.SetFullscreen(1); } catch (e) { /* iOS says no; play windowed */ }
+      }
+    });
+  </script>
+</body>
+</html>
