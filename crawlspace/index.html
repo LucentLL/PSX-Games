@@ -89,6 +89,17 @@
 
     .go:active { background: #17150f; }
 
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 0.7em;
+      font-size: clamp(12px, 2.6vw, 15px);
+      color: #8b8579;
+      cursor: pointer;
+    }
+
+    .opt input { accent-color: #7c7565; width: 1.05em; height: 1.05em; }
+
     #bar {
       width: min(58vw, 320px);
       height: 2px;
@@ -140,6 +151,8 @@
       <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
     </div>
 
+    <label class="opt"><input type="checkbox" id="invert" checked> invert the Y axis (pull down to look up)</label>
+
     <button class="go" id="go">ENTER</button>
     <div id="hint">turn your phone sideways</div>
   </div>
@@ -155,6 +168,21 @@
 
     var isTouch = (navigator.maxTouchPoints > 0) &&
                   /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
+
+    // Declared HERE, above the config that reads it.
+    //
+    // It used to live further down the file, and `var` hoisting meant the config
+    // read it as undefined, computed NaN, and Unity quietly fell back to the full
+    // device pixel ratio - so the cap did nothing at all and the canvas stayed at
+    // 2277x1917. Nothing errored; the only symptom was the frame rate.
+    //
+    // The game renders its scene at full canvas resolution and only THEN
+    // downsamples to a 640x480 PlayStation framebuffer. Uncapped on a high-DPI
+    // phone that is a base pass plus two per-pixel light passes over millions of
+    // pixels, to produce an image that is about to be thrown away and replaced
+    // with 640x480. Capping near the framebuffer the game already targets costs
+    // nothing visually and is most of the frame rate.
+    var MAX_BACKING_HEIGHT = 540;
 
     if (isTouch) {
       document.querySelector("#desktop-help").style.display = "none";
@@ -185,16 +213,19 @@
       }
     };
 
-    // A phone rendering at 3x device pixel ratio is doing nine times the work for
-    // a picture that is deliberately 640x480 before it is scaled up. Pin it to 1.
-    if (isTouch) config.devicePixelRatio = 1;
+    // Setting canvas.width by hand does NOT work: Unity's runtime owns the
+    // backing store and recomputes it from the CSS size times this ratio on every
+    // resize, so anything written directly is overwritten within a frame. The
+    // measured proof was a canvas still sitting at 2277x1917 with a hand-rolled
+    // cap in place. This is the supported lever, and the only one.
+    config.devicePixelRatio =
+      Math.min(1, MAX_BACKING_HEIGHT / Math.max(1, window.innerHeight));
 
     var instance = null;
 
+    // CSS size only. The backing store belongs to Unity - see devicePixelRatio
+    // above.
     function resize() {
-      var ratio = isTouch ? 1 : Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(window.innerWidth * ratio);
-      canvas.height = Math.floor(window.innerHeight * ratio);
       canvas.style.width = window.innerWidth + "px";
       canvas.style.height = window.innerHeight + "px";
     }
@@ -227,6 +258,15 @@
       start.style.display = "none";
       canvas.focus();
       resize();
+
+      // Hand the look preference to the game before the player touches anything.
+      // "Head" is the camera object; ConstrainedHeadLook lives on it.
+      if (instance && instance.SendMessage) {
+        try {
+          instance.SendMessage("Head", "SetInvertY",
+                               document.querySelector("#invert").checked ? 1 : 0);
+        } catch (e) { /* the in-game I key still works */ }
+      }
 
       if (isTouch && instance && instance.SetFullscreen) {
         try { instance.SetFullscreen(1); } catch (e) { /* iOS says no; play windowed */ }
