@@ -211,14 +211,34 @@
     });
 
     var buildUrl = "Build";
+
+    // Every build's files get their own URLs.
+    //
+    // The four files in Build/ keep the same names for ever, and GitHub Pages
+    // serves them with a ten-minute max-age, so somebody who was playing the last
+    // build and reloads into this one gets whichever of the four the browser still
+    // has plus whichever it happens to re-fetch. A framework.js from one build and
+    // a .wasm from another do not link, and what the player sees is
+    //
+    //   LinkError: Import #108 "env" "invoke_viiiiffffffffi" requires a callable
+    //
+    // which reads as a broken build rather than as a stale cache. It cost a
+    // round-trip during a playtest to work that out, and it will do it again to
+    // anyone who reloads within ten minutes of a push.
+    //
+    // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
+    // this is a different URL every time and there is nothing to mix. Unity's own
+    // Cache Storage bucket keys on the URL as well, so it fixes both layers.
+    var v = "?v=" + encodeURIComponent("20260825.001624");
+
     var config = {
-      dataUrl: buildUrl + "/WebGL.data.unityweb",
-      frameworkUrl: buildUrl + "/WebGL.framework.js.unityweb",
-      codeUrl: buildUrl + "/WebGL.wasm.unityweb",
+      dataUrl: buildUrl + "/WebGL.data.unityweb" + v,
+      frameworkUrl: buildUrl + "/WebGL.framework.js.unityweb" + v,
+      codeUrl: buildUrl + "/WebGL.wasm.unityweb" + v,
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Crawlspace",
-      productVersion: "2.1.1",
+      productVersion: "20260825.001624",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
@@ -249,7 +269,7 @@
     resize();
 
     var script = document.createElement("script");
-    script.src = buildUrl + "/WebGL.loader.js";
+    script.src = buildUrl + "/WebGL.loader.js" + v;
     script.onload = function () {
       createUnityInstance(canvas, config, function (progress) {
         fill.style.width = (100 * progress) + "%";
