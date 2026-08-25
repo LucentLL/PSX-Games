@@ -43,6 +43,20 @@
       outline: none;
     }
 
+    /*
+     * The button is never allowed off the screen.
+     *
+     * This centred every child and let the column overflow both edges, so a
+     * title card with one line too many pushed ENTER out through the bottom
+     * of the viewport with no way to reach it - which is not a cosmetic
+     * problem, it is the game becoming unstartable. It shipped that way, in
+     * landscape first and then in portrait as the help grew.
+     *
+     * So the card is a column with exactly one flexible child. The title, the
+     * option and the button cannot shrink and cannot scroll away; the help
+     * text gets whatever height is left over and scrolls inside it when there
+     * is not enough. However long the controls list gets, ENTER is on screen.
+     */
     .overlay {
       position: fixed;
       inset: 0;
@@ -50,13 +64,16 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1.4em;
+      gap: 1.1em;
       background: #000;
       text-align: center;
-      padding: 6vh 8vw;
+      padding: 4vh 6vw;
       box-sizing: border-box;
+      overflow: hidden;
       z-index: 10;
     }
+
+    .overlay > * { flex: none; }
 
     .title {
       font-size: clamp(22px, 5.2vw, 44px);
@@ -73,6 +90,46 @@
     }
 
     .sub b { color: #a49d8f; font-weight: normal; }
+
+    /* The one child allowed to shrink, and the only one that scrolls.
+       min-height:0 is load-bearing - without it a flex child refuses to go
+       below its content height and overflows the card instead. */
+    .help {
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      line-height: 1.7;
+      /* The body kills touch scrolling so a thumb drag turns the head rather
+         than the page. This one block has to opt back in. */
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: #3a362f transparent;
+    }
+
+    .help::-webkit-scrollbar { width: 3px; }
+    .help::-webkit-scrollbar-thumb { background: #3a362f; }
+
+    /* Each control is one block, so the two-column layout below can never cut
+       a sentence in half down the middle of the card. */
+    .help > span { display: block; break-inside: avoid; }
+
+    /* Landscape on a phone is about 350 px tall with the browser chrome in it.
+       Tighten everything rather than relying on the scroll. */
+    @media (max-height: 620px) {
+      .overlay { gap: 0.7em; padding: 3vh 5vw; }
+      .help { line-height: 1.5; font-size: clamp(11px, 2.4vw, 13px); }
+      .title { font-size: clamp(18px, 4.4vw, 30px); }
+      .go { margin-top: 0.2em; padding: 0.6em 2em; }
+    }
+
+    /* Short AND wide - which is to say the orientation this game asks for.
+       There is no vertical room and plenty of horizontal, so the controls go
+       into two columns and everything is readable without scrolling for it.
+       Text nobody scrolls to is text nobody reads. */
+    @media (max-height: 620px) and (min-width: 660px) {
+      .help { column-count: 2; column-gap: 2.4em; max-width: 82ch; }
+    }
 
     .go {
       margin-top: 0.6em;
@@ -135,50 +192,28 @@
   <div class="overlay" id="start" style="display:none">
     <div class="title">Crawlspace</div>
 
-    <div class="sub" id="desktop-help">
-      <b>W</b> / <b>S</b> crawl &nbsp;·&nbsp; <b>A</b> / <b>D</b> shuffle &nbsp;·&nbsp; <b>mouse</b> look<br>
-      <b>hold left mouse</b> — or what you are carrying falls out of your hands<br>
-      <b>F</b> pocket the torch &nbsp;·&nbsp; <b>E</b> pick something up<br>
-      <b>hold M</b> — read the map. someone drew it. they did not finish.<br>
-      <b>1</b>–<b>4</b> or the <b>wheel</b> — stand, stoop, knees, flat out<br>
-      <b>shift</b> push harder &nbsp;·&nbsp; <b>F8</b> back to the entrance<br>
-      <b>hold space</b> — breathe out, to fit through what your chest will not.<br>
-      clear the squeeze before you have to breathe in. you will have to.<br>
-      <b>stuck?</b> wiggle — tap side to side, forward and back. backward<br>
-      always gives. forward, only where the rock is nearly enough.<br>
-      <b>to turn around</b> — look behind you and keep looking. your body<br>
-      comes round after your head, where the passage is wide enough.<br>
-      <b>too tight to turn?</b> shuffle to one wall and turn the other way —<br>
-      hips to the rock, and swing through the room you just left.<br>
-      <b>the way on is not always ahead</b> — look into a hole in the floor<br>
-      and keep crawling to go down head first. or look at it, back over<br>
-      the lip, and keep backing — feet first, eyes on the way out.<br>
-      stand up to reach a hole in the roof.<br>
-      <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
+    <div class="sub help" id="desktop-help">
+      <span><b>W</b>/<b>S</b> crawl &nbsp;·&nbsp; <b>A</b>/<b>D</b> shuffle &nbsp;·&nbsp; <b>mouse</b> look</span>
+      <span><b>hold left mouse</b> — or you drop what you are holding</span>
+      <span><b>1</b>–<b>4</b> or <b>wheel</b> — stand, stoop, knees, flat out</span>
+      <span><b>hold space</b> — breathe out, to fit where your chest will not</span>
+      <span><b>F</b> pocket torch &nbsp;·&nbsp; <b>E</b> pick up &nbsp;·&nbsp; <b>M</b> map &nbsp;·&nbsp; <b>shift</b> push</span>
+      <span><b>stuck?</b> wiggle — side to side, forward and back</span>
+      <span style="color:#4e4a43">turn around by looking behind you</span>
+      <span style="color:#4e4a43">holes in the floor take you head first, or feet first if you back in</span>
+      <span style="color:#4e4a43">no HUD — the breathing is the only readout you get</span>
     </div>
 
-    <div class="sub" id="touch-help" style="display:none">
-      <b>left thumb</b> — drag to crawl and shuffle<br>
-      <b>right thumb</b> — drag to look<br>
-      keeping a thumb on the screen is what keeps hold of what is in<br>
-      your hands. lift it and you drop them.<br>
-      <b>your pocket</b> is the bottom middle of the screen. drag a thing<br>
-      up out of it to hold it, let go to drop it, slide it back down<br>
-      to put it away.<br>
-      <b>to turn around</b> — keep dragging past the end of your neck.<br>
-      your body follows, where there is room for it.<br>
-      <b>too tight to turn?</b> shuffle to one wall and turn the other way —<br>
-      hips to the rock, and swing through the room you just left.<br>
-      <b>tap the figure</b> in the corner to change how you are lying.<br>
-      <b>hold EXHALE</b> when it appears — breathe out, to fit through what<br>
-      your chest will not. clear the squeeze before you have to breathe in.<br>
-      <b>stuck?</b> wiggle the stick — side to side, forward and back.<br>
-      backward always gives.<br>
-      <b>the way on is not always ahead</b> — look into a hole in the floor<br>
-      and keep crawling to go down head first. or look at it, then drag<br>
-      the stick back and keep backing — feet first, eyes on the way out.<br>
-      stand up to reach a hole in the roof.<br>
-      <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
+    <div class="sub help" id="touch-help" style="display:none">
+      <span><b>left thumb</b> crawl &nbsp;·&nbsp; <b>right thumb</b> look</span>
+      <span>a thumb on the screen is what holds what is in your hands</span>
+      <span><b>tap the figure</b> — stand, stoop, knees, flat out</span>
+      <span><b>hold EXHALE</b> — breathe out, to fit where your chest will not</span>
+      <span><b>your pocket</b> is the bottom middle — drag up to hold, down to stow</span>
+      <span><b>stuck?</b> wiggle the stick — side to side, forward and back</span>
+      <span style="color:#4e4a43">turn around by looking behind you</span>
+      <span style="color:#4e4a43">holes in the floor take you head first, or feet first if you back in</span>
+      <span style="color:#4e4a43">no HUD — the breathing is the only readout you get</span>
     </div>
 
     <label class="opt"><input type="checkbox" id="invert" checked> invert the Y axis (pull down to look up)</label>
