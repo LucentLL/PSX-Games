@@ -200,6 +200,7 @@
       <span><b>F</b> pocket torch &nbsp;·&nbsp; <b>E</b> pick up &nbsp;·&nbsp; <b>M</b> map &nbsp;·&nbsp; <b>shift</b> push</span>
       <span><b>stuck?</b> wiggle — side to side, forward and back</span>
       <span style="color:#4e4a43">turn around by looking behind you</span>
+      <span style="color:#4e4a43">a way on is a hole in one wall — shuffle across until you are beside it</span>
       <span style="color:#4e4a43">holes in the floor take you head first, or feet first if you back in</span>
       <span style="color:#4e4a43">no HUD — the breathing is the only readout you get</span>
     </div>
@@ -212,6 +213,7 @@
       <span><b>your pocket</b> is the bottom middle — drag up to hold, down to stow</span>
       <span><b>stuck?</b> wiggle the stick — side to side, forward and back</span>
       <span style="color:#4e4a43">turn around by looking behind you</span>
+      <span style="color:#4e4a43">a way on is a hole in one wall — shuffle across until you are beside it</span>
       <span style="color:#4e4a43">holes in the floor take you head first, or feet first if you back in</span>
       <span style="color:#4e4a43">no HUD — the breathing is the only readout you get</span>
     </div>
@@ -305,7 +307,7 @@
     // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
     // this is a different URL every time and there is nothing to mix. Unity's own
     // Cache Storage bucket keys on the URL as well, so it fixes both layers.
-    var v = "?v=" + encodeURIComponent("20260825.054433");
+    var v = "?v=" + encodeURIComponent("20260825.202807");
 
     var config = {
       dataUrl: buildUrl + "/WebGL.data.unityweb" + v,
@@ -314,7 +316,7 @@
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Crawlspace",
-      productVersion: "20260825.054433",
+      productVersion: "20260825.202807",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
