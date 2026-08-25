@@ -142,10 +142,18 @@
       <b>hold M</b> — read the map. someone drew it. they did not finish.<br>
       <b>1</b>–<b>4</b> or the <b>wheel</b> — stand, stoop, knees, flat out<br>
       <b>shift</b> push harder &nbsp;·&nbsp; <b>F8</b> back to the entrance<br>
+      <b>hold space</b> — breathe out, to fit through what your chest will not.<br>
+      clear the squeeze before you have to breathe in. you will have to.<br>
+      <b>stuck?</b> wiggle — tap side to side, forward and back. backward<br>
+      always gives. forward, only where the rock is nearly enough.<br>
       <b>to turn around</b> — look behind you and keep looking. your body<br>
       comes round after your head, where the passage is wide enough.<br>
+      <b>too tight to turn?</b> shuffle to one wall and turn the other way —<br>
+      hips to the rock, and swing through the room you just left.<br>
       <b>the way on is not always ahead</b> — look into a hole in the floor<br>
-      and keep crawling. stand up to reach one in the roof.<br>
+      and keep crawling to go down head first. or look at it, back over<br>
+      the lip, and keep backing — feet first, eyes on the way out.<br>
+      stand up to reach a hole in the roof.<br>
       <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
     </div>
 
@@ -159,9 +167,17 @@
       to put it away.<br>
       <b>to turn around</b> — keep dragging past the end of your neck.<br>
       your body follows, where there is room for it.<br>
+      <b>too tight to turn?</b> shuffle to one wall and turn the other way —<br>
+      hips to the rock, and swing through the room you just left.<br>
       <b>tap the figure</b> in the corner to change how you are lying.<br>
+      <b>hold EXHALE</b> when it appears — breathe out, to fit through what<br>
+      your chest will not. clear the squeeze before you have to breathe in.<br>
+      <b>stuck?</b> wiggle the stick — side to side, forward and back.<br>
+      backward always gives.<br>
       <b>the way on is not always ahead</b> — look into a hole in the floor<br>
-      and keep crawling. stand up to reach one in the roof.<br>
+      and keep crawling to go down head first. or look at it, then drag<br>
+      the stick back and keep backing — feet first, eyes on the way out.<br>
+      stand up to reach a hole in the roof.<br>
       <span style="color:#4e4a43">no HUD. the breathing is the only readout you get.</span>
     </div>
 
@@ -210,6 +226,31 @@
       }, { passive: false });
     });
 
+    // No key reaches the game while a card is covering it.
+    //
+    // The game runs underneath the overlays from the moment it loads, and
+    // Unity's keyboard capture listens on the whole window - so a player who
+    // taps Space (or W, or shift) at the title card while reading the controls
+    // is already exhaling, crawling and arming the grip rule behind the card.
+    // The observed failure: Space at the title trips the first-input gate, the
+    // grip grace runs out, and the player clicks ENTER to find the torch
+    // already on the floor. These listeners register before Unity's loader
+    // script is appended, so on the shared window target they run first;
+    // stopImmediatePropagation keeps the keystroke ours, and preventDefault
+    // stops Space from scrolling the page or re-clicking the focused button.
+    ["keydown", "keyup", "keypress"].forEach(function (name) {
+      window.addEventListener(name, function (e) {
+        if (start.style.display !== "none" || loading.style.display !== "none") {
+          // Default actions stay available - F5 still refreshes, tab still
+          // tabs - except the ones that scroll the page or re-click the
+          // focused ENTER button.
+          if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]
+              .indexOf(e.code) !== -1) e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }, true);
+    });
+
     var buildUrl = "Build";
 
     // Every build's files get their own URLs.
@@ -229,7 +270,7 @@
     // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
     // this is a different URL every time and there is nothing to mix. Unity's own
     // Cache Storage bucket keys on the URL as well, so it fixes both layers.
-    var v = "?v=" + encodeURIComponent("20260825.001624");
+    var v = "?v=" + encodeURIComponent("20260825.054433");
 
     var config = {
       dataUrl: buildUrl + "/WebGL.data.unityweb" + v,
@@ -238,7 +279,7 @@
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Crawlspace",
-      productVersion: "20260825.001624",
+      productVersion: "20260825.054433",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
