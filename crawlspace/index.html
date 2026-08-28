@@ -309,7 +309,7 @@
     // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
     // this is a different URL every time and there is nothing to mix. Unity's own
     // Cache Storage bucket keys on the URL as well, so it fixes both layers.
-    var v = "?v=" + encodeURIComponent("20260828.143520");
+    var v = "?v=" + encodeURIComponent("20260828.144028");
 
     var config = {
       dataUrl: buildUrl + "/WebGL.data.unityweb" + v,
@@ -318,7 +318,7 @@
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Crawlspace",
-      productVersion: "20260828.143520",
+      productVersion: "20260828.144028",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
