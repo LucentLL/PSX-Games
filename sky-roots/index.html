@@ -297,7 +297,7 @@
     // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
     // this is a different URL every time and there is nothing to mix. Unity's own
     // Cache Storage bucket keys on the URL as well, so it fixes both layers.
-    var v = "?v=" + encodeURIComponent("20260925.205923");
+    var v = "?v=" + encodeURIComponent("20260925.210432");
 
     var config = {
       dataUrl: buildUrl + "/SkyRoots.data.unityweb" + v,
@@ -306,7 +306,7 @@
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Sky Roots",
-      productVersion: "20260925.205923",
+      productVersion: "20260925.210432",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
@@ -372,6 +372,32 @@
 
       if (isTouch && instance && instance.SetFullscreen) {
         try { instance.SetFullscreen(1); } catch (e) { /* iOS says no; play windowed */ }
+      }
+
+      if (!isTouch) takeMouse();
+    });
+
+    // The page owns the pointer lock and tells the game when it has it. Unity's
+    // own lock state goes on saying "locked" after the browser refused, and
+    // then plain mouse movement over the page turns the head - see SkyLook.
+    function takeMouse() {
+      if (document.pointerLockElement === canvas || !canvas.requestPointerLock) return;
+      try {
+        var p = canvas.requestPointerLock();
+        if (p && p.catch) p.catch(function () { /* refused; the next click asks again */ });
+      } catch (e) { /* same */ }
+    }
+
+    canvas.addEventListener("mousedown", function () {
+      if (start.style.display === "none" && !isTouch) takeMouse();
+    });
+
+    document.addEventListener("pointerlockchange", function () {
+      if (instance && instance.SendMessage) {
+        try {
+          instance.SendMessage("Head", "SetPointerLocked",
+                               document.pointerLockElement === canvas ? 1 : 0);
+        } catch (e) { /* no mouse look, but nothing breaks */ }
       }
     });
   </script>
