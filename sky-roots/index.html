@@ -297,7 +297,7 @@
     // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
     // this is a different URL every time and there is nothing to mix. Unity's own
     // Cache Storage bucket keys on the URL as well, so it fixes both layers.
-    var v = "?v=" + encodeURIComponent("20260925.211351");
+    var v = "?v=" + encodeURIComponent("20260925.211821");
 
     var config = {
       dataUrl: buildUrl + "/SkyRoots.data.unityweb" + v,
@@ -306,7 +306,7 @@
       streamingAssetsUrl: "StreamingAssets",
       companyName: "LucentLL",
       productName: "Sky Roots",
-      productVersion: "20260925.211351",
+      productVersion: "20260925.211821",
       showBanner: function (msg, type) {
         if (type === "error") {
           err.style.display = "block";
