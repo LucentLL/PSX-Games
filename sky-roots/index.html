@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover so the notch does not letterbox the view; user-scalable=no
+       so a two-thumb grip does not pinch-zoom the page instead of playing. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Sky Roots</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #aab3c6;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      overflow: hidden;
+      /* Without these a thumb drag scrolls the page instead of turning the head. */
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #container {
+      position: fixed;
+      inset: 0;
+      display: block;
+    }
+
+    #unity-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      touch-action: none;
+      outline: none;
+    }
+
+    /*
+     * The button is never allowed off the screen.
+     *
+     * This centred every child and let the column overflow both edges, so a
+     * title card with one line too many pushed ENTER out through the bottom
+     * of the viewport with no way to reach it - which is not a cosmetic
+     * problem, it is the game becoming unstartable. It shipped that way, in
+     * landscape first and then in portrait as the help grew.
+     *
+     * So the card is a column with exactly one flexible child. The title, the
+     * option and the button cannot shrink and cannot scroll away; the help
+     * text gets whatever height is left over and scrolls inside it when there
+     * is not enough. However long the controls list gets, ENTER is on screen.
+     */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.1em;
+      background: #000;
+      text-align: center;
+      padding: 4vh 6vw;
+      box-sizing: border-box;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    .overlay > * { flex: none; }
+
+    .title {
+      font-size: clamp(22px, 5.2vw, 44px);
+      letter-spacing: 0.42em;
+      text-indent: 0.42em;
+      color: #d8d1c2;
+    }
+
+    .sub {
+      font-size: clamp(12px, 2.6vw, 15px);
+      line-height: 1.85;
+      color: #6f6a60;
+      max-width: 46ch;
+    }
+
+    .sub b { color: #a49d8f; font-weight: normal; }
+
+    /* The one child allowed to shrink, and the only one that scrolls.
+       min-height:0 is load-bearing - without it a flex child refuses to go
+       below its content height and overflows the card instead. */
+    .help {
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      line-height: 1.7;
+      /* The body kills touch scrolling so a thumb drag turns the head rather
+         than the page. This one block has to opt back in. */
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: #3a362f transparent;
+    }
+
+    .help::-webkit-scrollbar { width: 3px; }
+    .help::-webkit-scrollbar-thumb { background: #3a362f; }
+
+    /* Each control is one block, so the two-column layout below can never cut
+       a sentence in half down the middle of the card. */
+    .help > span { display: block; break-inside: avoid; }
+
+    /* Landscape on a phone is about 350 px tall with the browser chrome in it.
+       Tighten everything rather than relying on the scroll. */
+    @media (max-height: 620px) {
+      .overlay { gap: 0.7em; padding: 3vh 5vw; }
+      .help { line-height: 1.5; font-size: clamp(11px, 2.4vw, 13px); }
+      .title { font-size: clamp(18px, 4.4vw, 30px); }
+      .go { margin-top: 0.2em; padding: 0.6em 2em; }
+    }
+
+    /* Short AND wide - which is to say the orientation this game asks for.
+       There is no vertical room and plenty of horizontal, so the controls go
+       into two columns and everything is readable without scrolling for it.
+       Text nobody scrolls to is text nobody reads. */
+    @media (max-height: 620px) and (min-width: 660px) {
+      .help { column-count: 2; column-gap: 2.4em; max-width: 82ch; }
+    }
+
+    .go {
+      margin-top: 0.6em;
+      border: 1px solid #4a463e;
+      padding: 0.85em 2.4em;
+      font-size: clamp(13px, 3vw, 16px);
+      letter-spacing: 0.28em;
+      text-indent: 0.28em;
+      color: #cfc8b9;
+      background: transparent;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .go:active { background: #17150f; }
+
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 0.7em;
+      font-size: clamp(12px, 2.6vw, 15px);
+      color: #8b8579;
+      cursor: pointer;
+    }
+
+    .opt input { accent-color: #7c7565; width: 1.05em; height: 1.05em; }
+
+    #bar {
+      width: min(58vw, 320px);
+      height: 2px;
+      background: #201d18;
+    }
+
+    #fill { width: 0%; height: 100%; background: #7c7565; transition: width .2s; }
+
+    #hint { display: none; }
+    /* Portrait on a phone: the passage is a letterbox, so ask for landscape. */
+    @media (orientation: portrait) and (pointer: coarse) {
+      #hint { display: block; color: #6f6a60; font-size: clamp(11px, 2.6vw, 14px); }
+    }
+
+    #err {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: #2a0c0c; color: #e8b9b9; padding: .8em 1em;
+      font-size: 12px; display: none; white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+  </div>
+
+  <div class="overlay" id="loading">
+    <div class="title">Sky Roots</div>
+    <div class="sub">looking up</div>
+    <div id="bar"><div id="fill"></div></div>
+  </div>
+
+  <div class="overlay" id="start" style="display:none">
+    <div class="title">Sky Roots</div>
+
+    <div class="sub">
+      when the leaves fall, the branches are roots.<br>
+      the night is the soil they dig into.<br>
+      everything alive lives in between.
+    </div>
+
+    <div class="sub help" id="desktop-help">
+      <span><b>WASD</b> walk &nbsp;·&nbsp; <b>mouse</b> look &nbsp;·&nbsp; <b>shift</b> hurry</span>
+      <span style="color:#4e4a43">click to take the mouse &nbsp;·&nbsp; <b>esc</b> to let it go &nbsp;·&nbsp; <b>I</b> flips the look</span>
+    </div>
+
+    <div class="sub help" id="touch-help" style="display:none">
+      <span><b>left thumb</b> walk &nbsp;·&nbsp; <b>right thumb</b> look</span>
+      <span style="color:#4e4a43">push the left thumb all the way to hurry</span>
+    </div>
+
+    <label class="opt"><input type="checkbox" id="invert" checked> invert the Y axis (pull down to look up)</label>
+
+    <button class="go" id="go">ENTER</button>
+    <div id="hint">turn your phone sideways</div>
+  </div>
+
+  <div id="err"></div>
+
+  <script>
+    var canvas = document.querySelector("#unity-canvas");
+    var loading = document.querySelector("#loading");
+    var start = document.querySelector("#start");
+    var fill = document.querySelector("#fill");
+    var err = document.querySelector("#err");
+
+    var isTouch = (navigator.maxTouchPoints > 0) &&
+                  /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
+
+    // Declared HERE, above the config that reads it.
+    //
+    // It used to live further down the file, and `var` hoisting meant the config
+    // read it as undefined, computed NaN, and Unity quietly fell back to the full
+    // device pixel ratio - so the cap did nothing at all and the canvas stayed at
+    // 2277x1917. Nothing errored; the only symptom was the frame rate.
+    //
+    // The game renders its scene at full canvas resolution and only THEN
+    // downsamples to a 640x480 PlayStation framebuffer. Uncapped on a high-DPI
+    // phone that is a base pass plus two per-pixel light passes over millions of
+    // pixels, to produce an image that is about to be thrown away and replaced
+    // with 640x480. Capping near the framebuffer the game already targets costs
+    // nothing visually and is most of the frame rate.
+    var MAX_BACKING_HEIGHT = 540;
+
+    if (isTouch) {
+      document.querySelector("#desktop-help").style.display = "none";
+      document.querySelector("#touch-help").style.display = "block";
+    }
+
+    // Stop the browser from turning a walk into a page scroll.
+    ["touchstart", "touchmove", "touchend", "gesturestart"].forEach(function (name) {
+      document.addEventListener(name, function (e) {
+        if (e.target === canvas || e.target === document.body) e.preventDefault();
+      }, { passive: false });
+    });
+
+    // No key reaches the game while a card is covering it.
+    //
+    // The game runs underneath the overlays from the moment it loads, and
+    // Unity's keyboard capture listens on the whole window - so a player who
+    // taps Space (or W, or shift) at the title card while reading the controls
+    // is already exhaling, crawling and arming the grip rule behind the card.
+    // The observed failure: Space at the title trips the first-input gate, the
+    // grip grace runs out, and the player clicks ENTER to find the torch
+    // already on the floor. These listeners register before Unity's loader
+    // script is appended, so on the shared window target they run first;
+    // stopImmediatePropagation keeps the keystroke ours, and preventDefault
+    // stops Space from scrolling the page or re-clicking the focused button.
+    ["keydown", "keyup", "keypress"].forEach(function (name) {
+      window.addEventListener(name, function (e) {
+        if (start.style.display !== "none" || loading.style.display !== "none") {
+          // Default actions stay available - F5 still refreshes, tab still
+          // tabs - except the ones that scroll the page or re-click the
+          // focused ENTER button.
+          if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]
+              .indexOf(e.code) !== -1) e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }, true);
+    });
+
+    var buildUrl = "Build";
+
+    // Every build's files get their own URLs.
+    //
+    // The four files in Build/ keep the same names for ever, and GitHub Pages
+    // serves them with a ten-minute max-age, so somebody who was playing the last
+    // build and reloads into this one gets whichever of the four the browser still
+    // has plus whichever it happens to re-fetch. A framework.js from one build and
+    // a .wasm from another do not link, and what the player sees is
+    //
+    //   LinkError: Import #108 "env" "invoke_viiiiffffffffi" requires a callable
+    //
+    // which reads as a broken build rather than as a stale cache. It cost a
+    // round-trip during a playtest to work that out, and it will do it again to
+    // anyone who reloads within ten minutes of a push.
+    //
+    // The version stamp is bumped on every build - see CaveWebBuild.Configure - so
+    // this is a different URL every time and there is nothing to mix. Unity's own
+    // Cache Storage bucket keys on the URL as well, so it fixes both layers.
+    var v = "?v=" + encodeURIComponent("20260925.205923");
+
+    var config = {
+      dataUrl: buildUrl + "/SkyRoots.data.unityweb" + v,
+      frameworkUrl: buildUrl + "/SkyRoots.framework.js.unityweb" + v,
+      codeUrl: buildUrl + "/SkyRoots.wasm.unityweb" + v,
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "LucentLL",
+      productName: "Sky Roots",
+      productVersion: "20260925.205923",
+      showBanner: function (msg, type) {
+        if (type === "error") {
+          err.style.display = "block";
+          err.textContent = msg;
+        }
+      }
+    };
+
+    // Setting canvas.width by hand does NOT work: Unity's runtime owns the
+    // backing store and recomputes it from the CSS size times this ratio on every
+    // resize, so anything written directly is overwritten within a frame. The
+    // measured proof was a canvas still sitting at 2277x1917 with a hand-rolled
+    // cap in place. This is the supported lever, and the only one.
+    config.devicePixelRatio =
+      Math.min(1, MAX_BACKING_HEIGHT / Math.max(1, window.innerHeight));
+
+    var instance = null;
+
+    // CSS size only. The backing store belongs to Unity - see devicePixelRatio
+    // above.
+    function resize() {
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+    resize();
+
+    var script = document.createElement("script");
+    script.src = buildUrl + "/SkyRoots.loader.js" + v;
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (progress) {
+        fill.style.width = (100 * progress) + "%";
+      }).then(function (unityInstance) {
+        instance = unityInstance;
+        loading.style.display = "none";
+        start.style.display = "flex";
+        resize();
+      }).catch(function (message) {
+        loading.style.display = "none";
+        err.style.display = "block";
+        err.textContent = message;
+      });
+    };
+    document.body.appendChild(script);
+
+    // The gesture matters: browsers will not start an audio context or grant
+    // pointer lock without one, and this game wants the mouse.
+    document.querySelector("#go").addEventListener("click", function () {
+      start.style.display = "none";
+      canvas.focus();
+      resize();
+
+      // Hand the look preference to the game before the player touches anything.
+      // "Head" is the camera object; SkyLook lives on it.
+      if (instance && instance.SendMessage) {
+        try {
+          instance.SendMessage("Head", "SetInvertY",
+                               document.querySelector("#invert").checked ? 1 : 0);
+        } catch (e) { /* the in-game I key still works */ }
+      }
+
+      if (isTouch && instance && instance.SetFullscreen) {
+        try { instance.SetFullscreen(1); } catch (e) { /* iOS says no; play windowed */ }
+      }
+    });
+  </script>
+</body>
+</html>
